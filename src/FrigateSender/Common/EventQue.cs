@@ -9,7 +9,8 @@ namespace FrigateSender.Common
         private readonly List<EventData> _events = new List<EventData>();
         private readonly FrigateSenderConfiguration _configuration;
         private ILogger _logger;
-        
+
+        Dictionary<string, DateTime> _RateLimitCache = new Dictionary<string, DateTime>();
 
         public EventQue(ILogger logger, FrigateSenderConfiguration configuration)
         {
@@ -22,7 +23,21 @@ namespace FrigateSender.Common
             // only care about new and end as they are snapshots and videos
             if (eventData.EventType != EventType.Update)
             {
-                _logger.Information("Event Queued, Is of type: " + eventData.EventType);
+                // only rate limit new as this is when snapshots are sent.
+                if (eventData.EventType == EventType.New) 
+                {
+                    _logger.Information("is new event");
+                    var secondsSinceLastAddByCamera = GetTimeSinceCameraAdd(eventData.CameraName);
+                    if(secondsSinceLastAddByCamera != null && secondsSinceLastAddByCamera < _configuration.RateLimitTimeout)
+                    {
+                        _logger.Information("Skipping Snapshot from: {0} since it posted an image only {1} seconds ago. Skipped snapshot Id: {2}.", eventData.CameraName, ((int)(secondsSinceLastAddByCamera ?? -1)), eventData.EventId);
+                        return;
+                    }
+                    else 
+                        _logger.Information("{0} passed rate limit test, seconds: {1}", eventData.CameraName, secondsSinceLastAddByCamera);
+                }
+
+                _logger.Information("Event Queued from {0}, Is of type: {1}.", eventData.CameraName, eventData.EventType);
 
                 lock (_lockObject)
                 {
@@ -32,12 +47,30 @@ namespace FrigateSender.Common
                         .GroupBy(e => e.EventType)
                         .Select(e => $"{e.Key}: {e.Count()}");
                     _logger.Information("EventQue: Current event que: " + string.Join(", ", eventsCount));
+
+                    // save last time snapshot was sent (new == snapshot).
+                    if (eventData.EventType == EventType.New)
+                    {
+                        _logger.Information("Updating Snapshottime for {0}", eventData.CameraName);
+                        _RateLimitCache[eventData.CameraName] = DateTime.Now;
+                    }
                 }
             }
             else
             {
                 _logger.Information("EventQue: Skipping event. Is of type: " + eventData.EventType);
             }
+        }
+
+        private int? GetTimeSinceCameraAdd(string cameraName)
+        {
+            if (cameraName == null)
+                return null;
+
+            if(_RateLimitCache.ContainsKey(cameraName) == false)
+                return null;
+
+            return (int) Math.Round((DateTime.Now - _RateLimitCache[cameraName]).TotalSeconds, 0);
         }
 
         public EventData? GetNext()

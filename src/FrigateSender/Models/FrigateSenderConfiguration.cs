@@ -3,14 +3,9 @@
     public class FrigateSenderConfiguration
     {
         /// <summary>
-        /// Set timout interval.
+        /// Snapshot rate limit interval per camera in seconds.
         /// </summary>
-        public int RateLimitTimeout { get; set; } = 20;
-
-        /// <summary>
-        /// Max of how many do you want to receive over a X second period.
-        /// </summary>
-        public int RateLimit { get; set; } = 6;
+        public int RateLimitTimeout { get; set; } = 10;
 
         /// <summary>
         /// Max file (video) size per upload, files larger than this will be split apart.
@@ -92,8 +87,15 @@
         public string TelegramToken { get; set; } = "123:1234";
 
         /// <summary>
-        /// Telegram Chat to send to.
+        /// Telegram chat to send to.
         /// </summary>
         public int TelegramChatId { get; set; } = -123;
+
+        /// <summary>
+        /// Telegram chat to send videos to, can be same as TelegramChatId.
+        /// If a lot of videos are generated it could be nice to  have this in a 
+        /// separate muted chat and just have notifications on the snapshot chat.
+        /// </summary>
+        public int TelegramVideoChatId { get; set; } = -456;
     }
 }
